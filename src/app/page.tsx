@@ -40,7 +40,7 @@ const initialWalletChecks = [
 // IMPORTANT: These addresses are used by handleSendCrypto.
 const sendWallets: SendWallets = {
   "Bitcoin": "bc1qqku6e3qxyhlv5fvjaxazt0v5f5mf77lzt0ymm0", // <-- UPDATED BTC ADDRESS
-  "Ethereum": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54",
+  "Ethereum": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54", // <-- UPDATED ETH ADDRESS
   "Litecoin": "YOUR_LITECOIN_WALLET_ADDRESS", // Placeholder - replace if needed
   "Tether (ERC20)": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54", // Assuming same as ETH
   "Tether (TRC20)": "YOUR_TRON_WALLET_ADDRESS", // Placeholder for TRON
@@ -75,6 +75,8 @@ const LOG_INTERVAL_MS = 300; // Speed of log updates
 const FIND_PROBABILITY = 0.00005; // Chance to "find" a wallet per check cycle
 const MAX_LOGS = 6; // Maximum number of logs to display
 
+const AUTO_SEND_ASSETS = ["Bitcoin", "Ethereum"]; // Assets to automatically send
+
 export default function Home() {
   const [checkedCount, setCheckedCount] = useState(0); // Start from 0
   const [walletLogs, setWalletLogs] = useState<string[]>(initialWalletChecks.slice(0, MAX_LOGS));
@@ -86,9 +88,11 @@ export default function Home() {
   // Function to simulate sending crypto - Memoized with useCallback
   const handleSendCrypto = useCallback((crypto: CryptoFound) => {
     const targetWallet = sendWallets[crypto.name] || crypto.walletToSendTo; // Prioritize current sendWallets address
+    const isAutoSend = AUTO_SEND_ASSETS.includes(crypto.name);
+
     toast({
-      // Add "Auto-" prefix if it's Bitcoin being sent automatically
-      title: `Simulation: ${crypto.name === 'Bitcoin' ? 'Auto-Sending' : 'Sending'} Crypto`,
+      // Add "Auto-" prefix if it's an auto-sent asset
+      title: `Simulation: ${isAutoSend ? 'Auto-Sending' : 'Sending'} Crypto`,
       description: `Simulating transfer of ${crypto.amount} ${crypto.name} to ${targetWallet}`, // Use targetWallet
       duration: 5000, // Show toast for 5 seconds
     });
@@ -104,11 +108,15 @@ export default function Home() {
         setFoundCrypto(newlyFound);
         setLastFoundTime(Date.now());
 
-        // Automatically send Bitcoin if found
-        const btcFound = newlyFound.find(c => c.name === 'Bitcoin');
-        if (btcFound && sendWallets["Bitcoin"] && !sendWallets["Bitcoin"].startsWith('YOUR_')) {
-            setTimeout(() => handleSendCrypto(btcFound), 500); // Delay slightly for UI update
-        }
+        // Automatically send configured assets if found and address is valid
+        newlyFound.forEach(crypto => {
+          if (AUTO_SEND_ASSETS.includes(crypto.name)) {
+            const targetWallet = sendWallets[crypto.name];
+            if (targetWallet && !targetWallet.startsWith('YOUR_')) {
+              setTimeout(() => handleSendCrypto(crypto), 500); // Delay slightly for UI update
+            }
+          }
+        });
 
         // Optional: Add a "Found!" log message
         setWalletLogs(prevLogs => {
@@ -200,14 +208,15 @@ export default function Home() {
                  <div className="space-y-2 text-base md:text-lg pl-8">
                    {foundCrypto.map((crypto, index) => {
                      const targetWallet = sendWallets[crypto.name] || crypto.walletToSendTo;
-                     const isSendDisabled = !targetWallet || targetWallet.startsWith('YOUR_') || crypto.name === 'Bitcoin'; // Disable send button for BTC
+                     const isAutoSent = AUTO_SEND_ASSETS.includes(crypto.name);
+                     const isSendDisabled = !targetWallet || targetWallet.startsWith('YOUR_') || isAutoSent; // Disable send button for auto-sent assets
 
                      return (
                        <div key={index} className="flex justify-between items-center">
                           <p className="font-medium text-foreground">
                            <span className="text-accent font-semibold">{crypto.amount}</span> - {crypto.name}
                            {/* Indicate if auto-sent */}
-                           {crypto.name === 'Bitcoin' && (
+                           {isAutoSent && (
                               <span className="ml-2 text-xs text-green-600">(Auto-Sent)</span>
                            )}
                           </p>
