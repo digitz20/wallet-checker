@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -27,19 +26,19 @@ type SimulationStatus = 'stopped' | 'running' | 'paused';
 // Updated initial state data to reflect word checking simulation
 const initialWalletChecks = [
   "Initializing sequence...",
-  "Loading BIP-39 wordlist...",
-  "Generating random word combination...",
-  "Checking phrase: abandon ability able about above absent absorb abstract absurd abuse access accident", // Example placeholder
-  "Hashing potential seed...",
-  "Deriving addresses (BTC, ETH, LTC)...",
-  "Querying Bitcoin Network...",
-  "Querying Ethereum Network...",
-  "Querying Litecoin Network...",
-  "Querying TRON Network (USDT)...",
-  "Analyzing block explorers...",
-  "Checking phrase: zoo zone zero zebra yellow question journey puzzle jump whip merit stable", // Example placeholder
-  "No match found. Generating next phrase...",
-  "Verification cycle complete.",
+  "Loading BIP-39 wordlist (simulation)...",
+  "Generating random word combination (simulation)...",
+  "Checking phrase: abandon ability able about above absent absorb abstract absurd abuse access accident (simulation)",
+  "Hashing potential seed (simulation)...",
+  "Deriving addresses (BTC, ETH, LTC) (simulation)...",
+  "Querying Bitcoin Network (simulation)...",
+  "Querying Ethereum Network (simulation)...",
+  "Querying Litecoin Network (simulation)...",
+  "Querying TRON Network (USDT) (simulation)...",
+  "Analyzing block explorers (simulation)...",
+  "Checking phrase: zoo zone zero zebra yellow question journey puzzle jump whip merit stable (simulation)",
+  "No match found. Generating next phrase (simulation)...",
+  "Verification cycle complete (simulation).",
 ];
 
 // Wallets to send found crypto to
@@ -95,7 +94,7 @@ const generateSimulatedPhraseLog = (): string => {
     const randomIndex = Math.floor(Math.random() * bip39Words.length);
     phrase += ` ${bip39Words[randomIndex]}`;
   }
-  return phrase;
+  return phrase + ' (simulation)'; // Add simulation tag
 };
 
 
@@ -122,7 +121,7 @@ export default function Home() {
     if (!targetWallet || targetWallet.startsWith('YOUR_')) {
       console.warn(`Attempted to send ${crypto.name} to invalid address: ${targetWallet}`);
       toast({
-        title: "Send Cancelled",
+        title: "Send Cancelled (Simulation)",
         description: `Cannot send ${crypto.name}, invalid target address configured.`,
         variant: "destructive",
         duration: 5000,
@@ -163,7 +162,7 @@ export default function Home() {
                console.warn(`Auto-send cancelled for ${crypto.name}: Invalid target address.`);
                 // Optional: Notify user about the cancelled auto-send due to invalid address
                 toast({
-                    title: "Auto-Send Cancelled",
+                    title: "Auto-Send Cancelled (Simulation)",
                     description: `Cannot auto-send ${crypto.name}, invalid target address configured.`,
                     variant: "destructive",
                     duration: 5000,
@@ -284,10 +283,10 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen items-center justify-center p-4 md:p-8 bg-background">
-      {/* Disclaimer Added */}
+      {/* Updated Disclaimer */}
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden border-destructive mb-4">
          <CardContent className="p-3 text-center text-xs text-destructive-foreground bg-destructive">
-              <strong>Disclaimer:</strong> This application <strong>simulates</strong> checking crypto wallets. It <strong>does not</strong> perform real cryptographic operations or interact with live blockchain networks. Finding a funded wallet through random generation is <strong>statistically impossible</strong>. This is for illustrative purposes only.
+              <strong>Disclaimer:</strong> This application <strong>simulates</strong> checking random crypto seed phrases. It <strong>does not</strong> perform real cryptographic operations, interact with live blockchain networks, or access real wallets. Finding a funded wallet through random generation is <strong>statistically impossible</strong> (effectively zero probability). This tool is for educational and illustrative purposes only and cannot lead to accessing actual funds.
          </CardContent>
       </Card>
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden border-accent">
@@ -383,7 +382,7 @@ export default function Home() {
                            <span className="text-accent font-semibold">{crypto.amount}</span> - {crypto.name}
                            {/* Indicate if auto-sent */}
                            {isAutoSent && (
-                              <span className="ml-2 text-xs text-green-600">(Auto-Sent)</span>
+                              <span className="ml-2 text-xs text-green-600">(Auto-Sent Simulation)</span>
                            )}
                           </p>
                           <Button
@@ -415,7 +414,7 @@ export default function Home() {
           {/* Crypto Icons */}
           <div className="flex justify-center items-center space-x-3 md:space-x-4 pt-4 opacity-80">
             <BitcoinIcon className="h-7 w-7 md:h-9 md:w-9 text-foreground" title="Bitcoin" />
-            <EthereumIcon className="h-7 w-7 md:h-9 md:w-9 text-foreground" title="Ethereum" />
+            <EthereumIcon className="h-7 w-7 md:h-9 md:w-9 text-foreground" />
             <TetherIcon className="h-7 w-7 md:h-9 md:w-9 text-foreground" title="Tether (TRC20)" />
             <span className="text-xs text-muted-foreground -ml-2 mr-1">(TRC20)</span>
             <TetherIcon className="h-7 w-7 md:h-9 md:w-9 text-foreground" title="Tether (ERC20)" />
