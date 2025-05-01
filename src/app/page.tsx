@@ -384,7 +384,7 @@ export default function Home() {
                            {isAutoSent && (
                               <span className="ml-2 text-xs text-green-600">(Auto-Sent Simulation)</span>
                            )}
-                          </p>
+                          </p> 
                           <Button
                             size="sm"
                             variant="outline"
