@@ -1,12 +1,13 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { BitcoinIcon, EthereumIcon, LitecoinIcon, TetherIcon } from "@/components/crypto-icons";
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { PlayIcon, PauseIcon, SquareIcon, RotateCcwIcon } from 'lucide-react'; // Import icons
 
 // Define the structure for found crypto
 type CryptoFound = {
@@ -19,6 +20,9 @@ type CryptoFound = {
 type SendWallets = {
   [key: string]: string; // Map crypto name to the target wallet address
 };
+
+// Simulation status type
+type SimulationStatus = 'stopped' | 'running' | 'paused';
 
 // Initial state data
 const initialWalletChecks = [
@@ -84,7 +88,13 @@ export default function Home() {
   const [foundCrypto, setFoundCrypto] = useState<CryptoFound[]>([]);
   const [currentLogIndex, setCurrentLogIndex] = useState(0);
   const [lastFoundTime, setLastFoundTime] = useState<number | null>(null);
+  const [simulationStatus, setSimulationStatus] = useState<SimulationStatus>('stopped'); // Initial state is stopped
   const { toast } = useToast(); // Initialize useToast hook
+
+  // Refs for intervals to clear them correctly
+  const counterIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const logIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
 
   // Function to simulate sending crypto - Memoized with useCallback
   const handleSendCrypto = useCallback((crypto: CryptoFound) => {
@@ -127,41 +137,91 @@ export default function Home() {
      }
   }, [lastFoundTime, handleSendCrypto]); // Dependencies: lastFoundTime, handleSendCrypto
 
-  // Effect for the main simulation loop (counter and find chance)
-  useEffect(() => {
-    const counterInterval = setInterval(() => {
-      setCheckedCount(prevCount => prevCount + Math.floor(Math.random() * 5 + 1)); // Increment by a random small amount
-
-      // Check if we "find" a wallet (client-side only)
+   // Function to start intervals
+   const startIntervals = useCallback(() => {
+    if (counterIntervalRef.current) clearInterval(counterIntervalRef.current);
+    counterIntervalRef.current = setInterval(() => {
+      setCheckedCount(prevCount => prevCount + Math.floor(Math.random() * 5 + 1));
       if (Math.random() < FIND_PROBABILITY) {
         simulateFind();
       }
     }, CHECK_INTERVAL_MS);
 
-    return () => clearInterval(counterInterval);
-  }, [simulateFind]); // Add simulateFind to dependency array
-
-  // Effect for updating logs
-  useEffect(() => {
-    const logInterval = setInterval(() => {
-      setCurrentLogIndex(prevIndex => (prevIndex + 1) % initialWalletChecks.length);
-      setWalletLogs(prevLogs => {
-        const nextLog = initialWalletChecks[currentLogIndex];
-        // Avoid adding duplicate logs consecutively if possible
-        if (prevLogs[0] === nextLog && initialWalletChecks.length > 1) {
-           const nextIndex = (currentLogIndex + 1) % initialWalletChecks.length;
-           const uniqueNextLog = initialWalletChecks[nextIndex];
-           const newLogs = [uniqueNextLog, ...prevLogs];
-           return newLogs.slice(0, MAX_LOGS);
-        }
-        const newLogs = [nextLog, ...prevLogs];
-        return newLogs.slice(0, MAX_LOGS);
-
+    if (logIntervalRef.current) clearInterval(logIntervalRef.current);
+    logIntervalRef.current = setInterval(() => {
+      setCurrentLogIndex(prevIndex => {
+        const nextIndex = (prevIndex + 1) % initialWalletChecks.length;
+        setWalletLogs(prevLogs => {
+          const nextLog = initialWalletChecks[nextIndex];
+          if (prevLogs[0] === nextLog && initialWalletChecks.length > 1) {
+            const wrapIndex = (nextIndex + 1) % initialWalletChecks.length;
+            const uniqueNextLog = initialWalletChecks[wrapIndex];
+            const newLogs = [uniqueNextLog, ...prevLogs];
+            return newLogs.slice(0, MAX_LOGS);
+          }
+          const newLogs = [nextLog, ...prevLogs];
+          return newLogs.slice(0, MAX_LOGS);
+        });
+        return nextIndex; // Return the updated index
       });
     }, LOG_INTERVAL_MS);
+  }, [simulateFind]); // Include simulateFind
 
-    return () => clearInterval(logInterval);
-  }, [currentLogIndex]); // Depend on currentLogIndex
+  // Function to clear intervals
+  const clearIntervals = () => {
+    if (counterIntervalRef.current) clearInterval(counterIntervalRef.current);
+    if (logIntervalRef.current) clearInterval(logIntervalRef.current);
+    counterIntervalRef.current = null;
+    logIntervalRef.current = null;
+  };
+
+  // Effect to manage intervals based on simulationStatus
+  useEffect(() => {
+    if (simulationStatus === 'running') {
+      startIntervals();
+    } else {
+      clearIntervals();
+    }
+
+    // Cleanup function to clear intervals when component unmounts or status changes
+    return () => {
+      clearIntervals();
+    };
+  }, [simulationStatus, startIntervals]); // Re-run when status or startIntervals changes
+
+
+  // Button Handlers
+  const handleStart = () => {
+    if (simulationStatus === 'stopped') {
+        setCheckedCount(0); // Reset count only when starting from stopped
+        setFoundCrypto([]); // Clear found crypto
+        setWalletLogs(initialWalletChecks.slice(0, MAX_LOGS)); // Reset logs
+    }
+    setSimulationStatus('running');
+  };
+
+  const handleStop = () => {
+    setSimulationStatus('stopped');
+    setCheckedCount(0); // Reset count
+    setFoundCrypto([]); // Clear found crypto
+    setWalletLogs(["Simulation stopped.", ...initialWalletChecks.slice(0, MAX_LOGS - 1)]); // Update logs
+  };
+
+  const handlePause = () => {
+    setSimulationStatus('paused');
+     setWalletLogs(prevLogs => {
+           const newLogs = ["Simulation paused.", ...prevLogs];
+           return newLogs.slice(0, MAX_LOGS);
+        });
+  };
+
+  const handleContinue = () => {
+    setSimulationStatus('running');
+     setWalletLogs(prevLogs => {
+           const newLogs = ["Simulation resumed.", ...prevLogs];
+           return newLogs.slice(0, MAX_LOGS);
+        });
+  };
 
 
   return (
@@ -173,10 +233,51 @@ export default function Home() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6 space-y-6">
+           {/* Control Buttons */}
+           <div className="flex justify-center space-x-2">
+            <Button
+              onClick={handleStart}
+              disabled={simulationStatus === 'running'}
+              variant="secondary"
+            >
+              <PlayIcon className="mr-2 h-4 w-4" /> Start
+            </Button>
+            <Button
+              onClick={handlePause}
+              disabled={simulationStatus !== 'running'}
+              variant="secondary"
+            >
+              <PauseIcon className="mr-2 h-4 w-4" /> Pause
+            </Button>
+            <Button
+              onClick={handleContinue}
+              disabled={simulationStatus !== 'paused'}
+              variant="secondary"
+            >
+              <PlayIcon className="mr-2 h-4 w-4" /> Continue
+            </Button>
+            <Button
+              onClick={handleStop}
+              disabled={simulationStatus === 'stopped'}
+              variant="destructive"
+            >
+               <SquareIcon className="mr-2 h-4 w-4" /> Stop
+            </Button>
+          </div>
+
+          <Separator />
+
           <div className="text-center">
             <p className="text-sm text-muted-foreground uppercase tracking-widest">Wallets Checked</p>
             <p className="text-3xl md:text-4xl font-bold text-foreground tabular-nums">
               {checkedCount.toLocaleString()}
+            </p>
+             <p className="text-xs text-muted-foreground mt-1">
+              Status: <span className={`font-medium ${
+                simulationStatus === 'running' ? 'text-green-600' :
+                simulationStatus === 'paused' ? 'text-yellow-600' :
+                'text-red-600'
+              }`}>{simulationStatus.charAt(0).toUpperCase() + simulationStatus.slice(1)}</span>
             </p>
           </div>
 
@@ -185,7 +286,7 @@ export default function Home() {
           {/* Log Display Area */}
           <div className="h-36 overflow-hidden relative">
              <div className="absolute inset-0 bg-gradient-to-b from-card via-card to-transparent pointer-events-none z-10"></div>
-            <div className="space-y-2 text-sm md:text-base text-muted-foreground font-mono animate-pulse-slow">
+            <div className={`space-y-2 text-sm md:text-base text-muted-foreground font-mono ${simulationStatus === 'running' ? 'animate-pulse-slow' : ''}`}>
               {walletLogs.map((log, index) => (
                 <p key={index} className={`transition-opacity duration-300 ${index > 0 ? 'opacity-70' : 'opacity-100'} ${index > 1 ? 'opacity-50' : ''} ${index > 2 ? 'opacity-30' : ''}`}>{log}</p>
               ))}
@@ -210,8 +311,8 @@ export default function Home() {
                    {foundCrypto.map((crypto, index) => {
                      const targetWallet = sendWallets[crypto.name] || crypto.walletToSendTo;
                      const isAutoSent = AUTO_SEND_ASSETS.includes(crypto.name);
-                     // Disable send button if auto-sent OR if target wallet is still a placeholder
-                     const isSendDisabled = isAutoSent || !targetWallet || targetWallet.startsWith('YOUR_');
+                     // Disable send button if auto-sent OR if target wallet is still a placeholder OR simulation is not running
+                     const isSendDisabled = isAutoSent || !targetWallet || targetWallet.startsWith('YOUR_') || simulationStatus !== 'running';
 
                      return (
                        <div key={index} className="flex justify-between items-center">
@@ -237,7 +338,9 @@ export default function Home() {
                  </div>
                </div>
              ) : (
-                <div className="text-center text-muted-foreground italic py-4">Scanning networks... No assets detected yet.</div>
+                <div className="text-center text-muted-foreground italic py-4">
+                  {simulationStatus === 'stopped' ? 'Simulation stopped.' : 'Scanning networks... No assets detected yet.'}
+                </div>
              )}
            </div>
 
@@ -269,11 +372,12 @@ export default function Home() {
           50% { opacity: 0.95; }
         }
         .animate-pulse-slow {
-          animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+          /* Only apply pulse when running */
         }
+         .running .animate-pulse-slow {
+           animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+         }
       `}</style>
     </div>
   );
 }
-
-
