@@ -5,8 +5,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 
 export const metadata: Metadata = {
-  title: 'CryptoBolt Inspector', // Updated App Name
-  description: 'Check the results of wallet checks.',
+  title: 'Crypto Wallet Inspector', // Updated App Name
+  description: 'Simulating the process of checking random seeds for crypto wallets.', // Updated description
 };
 
 export default function RootLayout({
