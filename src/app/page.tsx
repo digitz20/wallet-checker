@@ -5,11 +5,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { BitcoinIcon, EthereumIcon, LitecoinIcon, TetherIcon } from "@/components/crypto-icons";
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
 
 // Define the structure for found crypto
 type CryptoFound = {
   name: string;
   amount: string;
+  walletToSendTo: string; // Add wallet address to send to
+};
+
+// Define the structure for wallets to send to
+type SendWallets = {
+  [key: string]: string; // Map crypto name to wallet address
 };
 
 // Initial state data
@@ -28,23 +36,33 @@ const initialWalletChecks = [
   "Wallet check: Verification cycle complete.",
 ];
 
+// Wallets to send found crypto to
+const sendWallets: SendWallets = {
+  "Bitcoin": "bc1qqku6e3qxyhlv5fvjaxazt0v5f5mf77lzt0ymm0",
+  "Ethereum": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54",
+  "Litecoin": "YOUR_LITECOIN_WALLET_ADDRESS", // Placeholder - replace if needed
+  "Tether (ERC20)": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54", // Assuming same as ETH
+  "Tether (TRC20)": "YOUR_TRON_WALLET_ADDRESS", // Placeholder for TRON
+};
+
+
 const cryptoPresets: CryptoFound[][] = [
   [
-    { name: "Bitcoin", amount: "0.78 BTC" },
-    { name: "Ethereum", amount: "4.15 ETH" },
-    { name: "Tether (ERC20)", amount: "1,250.00 USDT" },
+    { name: "Bitcoin", amount: "0.78 BTC", walletToSendTo: sendWallets["Bitcoin"] },
+    { name: "Ethereum", amount: "4.15 ETH", walletToSendTo: sendWallets["Ethereum"] },
+    { name: "Tether (ERC20)", amount: "1,250.00 USDT", walletToSendTo: sendWallets["Tether (ERC20)"] },
   ],
   [
-    { name: "Litecoin", amount: "15.30 LTC" },
-    { name: "Bitcoin", amount: "0.12 BTC" },
+    { name: "Litecoin", amount: "15.30 LTC", walletToSendTo: sendWallets["Litecoin"] },
+    { name: "Bitcoin", amount: "0.12 BTC", walletToSendTo: sendWallets["Bitcoin"] },
   ],
   [
-    { name: "Ethereum", amount: "22.05 ETH" },
-    { name: "Tether (TRC20)", amount: "5,600.00 USDT" },
-    { name: "Litecoin", amount: "8.50 LTC" },
+    { name: "Ethereum", amount: "22.05 ETH", walletToSendTo: sendWallets["Ethereum"] },
+    { name: "Tether (TRC20)", amount: "5,600.00 USDT", walletToSendTo: sendWallets["Tether (TRC20)"] },
+    { name: "Litecoin", amount: "8.50 LTC", walletToSendTo: sendWallets["Litecoin"] },
   ],
     [
-    { name: "Bitcoin", amount: "1.03 BTC" },
+    { name: "Bitcoin", amount: "1.03 BTC", walletToSendTo: sendWallets["Bitcoin"] },
   ],
 ];
 
@@ -55,11 +73,12 @@ const FIND_PROBABILITY = 0.00005; // Chance to "find" a wallet per check cycle
 const MAX_LOGS = 6; // Maximum number of logs to display
 
 export default function Home() {
-  const [checkedCount, setCheckedCount] = useState(488737851); // Start from a high number
+  const [checkedCount, setCheckedCount] = useState(0); // Start from 0
   const [walletLogs, setWalletLogs] = useState<string[]>(initialWalletChecks.slice(0, MAX_LOGS));
   const [foundCrypto, setFoundCrypto] = useState<CryptoFound[]>([]);
   const [currentLogIndex, setCurrentLogIndex] = useState(0);
   const [lastFoundTime, setLastFoundTime] = useState<number | null>(null);
+  const { toast } = useToast(); // Initialize useToast hook
 
   // Function to simulate finding a wallet
   const simulateFind = useCallback(() => {
@@ -112,6 +131,18 @@ export default function Home() {
     return () => clearInterval(logInterval);
   }, [currentLogIndex]); // Depend on currentLogIndex
 
+  // Function to simulate sending crypto
+  const handleSendCrypto = (crypto: CryptoFound) => {
+    // Simulate sending - show a toast message
+    toast({
+      title: "Simulation: Sending Crypto",
+      description: `Simulating transfer of ${crypto.amount} ${crypto.name} to ${crypto.walletToSendTo}`,
+      duration: 5000, // Show toast for 5 seconds
+    });
+    // Here you would add actual transaction logic if this wasn't a simulation
+  };
+
+
   return (
     <div className="flex flex-col min-h-screen items-center justify-center p-4 md:p-8 bg-background">
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden">
@@ -154,11 +185,22 @@ export default function Home() {
                    </svg>
                    Assets Found: {foundCrypto.length}
                  </p>
-                 <div className="space-y-1 text-base md:text-lg pl-8">
+                 <div className="space-y-2 text-base md:text-lg pl-8">
                    {foundCrypto.map((crypto, index) => (
-                     <p key={index} className="font-medium text-foreground">
-                       <span className="text-accent font-semibold">{crypto.amount}</span> - {crypto.name}
-                     </p>
+                     <div key={index} className="flex justify-between items-center">
+                        <p className="font-medium text-foreground">
+                         <span className="text-accent font-semibold">{crypto.amount}</span> - {crypto.name}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleSendCrypto(crypto)}
+                          className="ml-4"
+                          disabled={!crypto.walletToSendTo || crypto.walletToSendTo.startsWith('YOUR_')} // Disable if no valid wallet
+                        >
+                          Send
+                        </Button>
+                     </div>
                    ))}
                  </div>
                </div>
