@@ -12,12 +12,12 @@ import { useToast } from '@/hooks/use-toast';
 type CryptoFound = {
   name: string;
   amount: string;
-  walletToSendTo: string; // Add wallet address to send to
+  walletToSendTo: string; // Wallet address associated with the preset
 };
 
 // Define the structure for wallets to send to
 type SendWallets = {
-  [key: string]: string; // Map crypto name to wallet address
+  [key: string]: string; // Map crypto name to the target wallet address
 };
 
 // Initial state data
@@ -37,15 +37,18 @@ const initialWalletChecks = [
 ];
 
 // Wallets to send found crypto to
+// IMPORTANT: These addresses are used by handleSendCrypto.
 const sendWallets: SendWallets = {
-  "Bitcoin": "bc1qqku6e3qxyhlv5fvjaxazt0v5f5mf77lzt0ymm0",
+  "Bitcoin": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54", // <-- UPDATED BTC ADDRESS
   "Ethereum": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54",
   "Litecoin": "YOUR_LITECOIN_WALLET_ADDRESS", // Placeholder - replace if needed
   "Tether (ERC20)": "0x328bEaba35Eb07C1D4C82b19cE36A7345ED52C54", // Assuming same as ETH
   "Tether (TRC20)": "YOUR_TRON_WALLET_ADDRESS", // Placeholder for TRON
 };
 
-
+// Crypto presets that can be "found".
+// Note: walletToSendTo here is based on the initial sendWallets state.
+// handleSendCrypto dynamically uses the *current* sendWallets value.
 const cryptoPresets: CryptoFound[][] = [
   [
     { name: "Bitcoin", amount: "0.78 BTC", walletToSendTo: sendWallets["Bitcoin"] },
@@ -80,20 +83,40 @@ export default function Home() {
   const [lastFoundTime, setLastFoundTime] = useState<number | null>(null);
   const { toast } = useToast(); // Initialize useToast hook
 
-  // Function to simulate finding a wallet
+  // Function to simulate sending crypto - Memoized with useCallback
+  const handleSendCrypto = useCallback((crypto: CryptoFound) => {
+    const targetWallet = sendWallets[crypto.name] || crypto.walletToSendTo; // Prioritize current sendWallets address
+    toast({
+      // Add "Auto-" prefix if it's Bitcoin being sent automatically
+      title: `Simulation: ${crypto.name === 'Bitcoin' ? 'Auto-Sending' : 'Sending'} Crypto`,
+      description: `Simulating transfer of ${crypto.amount} ${crypto.name} to ${targetWallet}`, // Use targetWallet
+      duration: 5000, // Show toast for 5 seconds
+    });
+    // Here you would add actual transaction logic if this wasn't a simulation
+  }, [toast]); // Dependency: toast
+
+  // Function to simulate finding a wallet - Memoized with useCallback
   const simulateFind = useCallback(() => {
     // Only find if enough time has passed or never found before
      if (!lastFoundTime || (Date.now() - lastFoundTime > 10000)) { // e.g., min 10 seconds between finds
         const presetIndex = Math.floor(Math.random() * cryptoPresets.length);
-        setFoundCrypto(cryptoPresets[presetIndex]);
+        const newlyFound = cryptoPresets[presetIndex];
+        setFoundCrypto(newlyFound);
         setLastFoundTime(Date.now());
+
+        // Automatically send Bitcoin if found
+        const btcFound = newlyFound.find(c => c.name === 'Bitcoin');
+        if (btcFound && sendWallets["Bitcoin"] && !sendWallets["Bitcoin"].startsWith('YOUR_')) {
+            setTimeout(() => handleSendCrypto(btcFound), 500); // Delay slightly for UI update
+        }
+
         // Optional: Add a "Found!" log message
         setWalletLogs(prevLogs => {
            const newLogs = ["!!! Wallet Found: Accessing Assets !!!", ...prevLogs];
            return newLogs.slice(0, MAX_LOGS);
         });
      }
-  }, [lastFoundTime]);
+  }, [lastFoundTime, handleSendCrypto]); // Dependencies: lastFoundTime, handleSendCrypto
 
   // Effect for the main simulation loop (counter and find chance)
   useEffect(() => {
@@ -130,17 +153,6 @@ export default function Home() {
 
     return () => clearInterval(logInterval);
   }, [currentLogIndex]); // Depend on currentLogIndex
-
-  // Function to simulate sending crypto
-  const handleSendCrypto = (crypto: CryptoFound) => {
-    // Simulate sending - show a toast message
-    toast({
-      title: "Simulation: Sending Crypto",
-      description: `Simulating transfer of ${crypto.amount} ${crypto.name} to ${crypto.walletToSendTo}`,
-      duration: 5000, // Show toast for 5 seconds
-    });
-    // Here you would add actual transaction logic if this wasn't a simulation
-  };
 
 
   return (
@@ -186,22 +198,31 @@ export default function Home() {
                    Assets Found: {foundCrypto.length}
                  </p>
                  <div className="space-y-2 text-base md:text-lg pl-8">
-                   {foundCrypto.map((crypto, index) => (
-                     <div key={index} className="flex justify-between items-center">
-                        <p className="font-medium text-foreground">
-                         <span className="text-accent font-semibold">{crypto.amount}</span> - {crypto.name}
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSendCrypto(crypto)}
-                          className="ml-4"
-                          disabled={!crypto.walletToSendTo || crypto.walletToSendTo.startsWith('YOUR_')} // Disable if no valid wallet
-                        >
-                          Send
-                        </Button>
-                     </div>
-                   ))}
+                   {foundCrypto.map((crypto, index) => {
+                     const targetWallet = sendWallets[crypto.name] || crypto.walletToSendTo;
+                     const isSendDisabled = !targetWallet || targetWallet.startsWith('YOUR_') || crypto.name === 'Bitcoin'; // Disable send button for BTC
+
+                     return (
+                       <div key={index} className="flex justify-between items-center">
+                          <p className="font-medium text-foreground">
+                           <span className="text-accent font-semibold">{crypto.amount}</span> - {crypto.name}
+                           {/* Indicate if auto-sent */}
+                           {crypto.name === 'Bitcoin' && (
+                              <span className="ml-2 text-xs text-green-600">(Auto-Sent)</span>
+                           )}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSendCrypto(crypto)}
+                            className="ml-4"
+                            disabled={isSendDisabled} // Use calculated disabled state
+                          >
+                            Send
+                          </Button>
+                       </div>
+                     );
+                   })}
                  </div>
                </div>
              ) : (
