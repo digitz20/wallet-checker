@@ -23,6 +23,7 @@ type SendWallets = {
 type SimulationStatus = 'stopped' | 'running' | 'paused';
 
 const ETHERSCAN_API_KEY = "ZKPID4755Q9BJZVXXZ96M3N6RSXYE7NTRV";
+const BLOCKCYPHER_API_KEY = "41ccb7c601ef4bad99b3698cfcea9a8c";
 
 const initialWalletChecks = [
   "Initializing sequence...",
@@ -31,7 +32,7 @@ const initialWalletChecks = [
   "Checking phrase: abandon ability able about above absent absorb abstract absurd abuse access accident",
   "Hashing potential seed...",
   "Deriving addresses (BTC, ETH, LTC)...",
-  "Querying Bitcoin Network...",
+  `Querying Bitcoin Network (BlockCypher API Active: ${BLOCKCYPHER_API_KEY ? 'Key Loaded' : 'No Key'})...`,
   `Querying Ethereum Network (Etherscan API Active: ${ETHERSCAN_API_KEY ? 'Key Loaded' : 'No Key'})...`,
   "Querying Litecoin Network...",
   "Querying TRON Network (USDT)...",
@@ -160,12 +161,7 @@ export default function Home() {
 
   const performApiBalanceCheck = useCallback(async (seedPhrase: string, cryptoName: string, presetAmount: string): Promise<string | null> => {
     if (cryptoName === "Ethereum" && ETHERSCAN_API_KEY) {
-        // In a real scenario, you would derive the Ethereum address from the seedPhrase.
-        // For this demonstration, we'll use a predefined address to actually query Etherscan,
-        // as deriving addresses and checking arbitrary ones is beyond the scope of this UI demo.
-        // The Etherscan API checks a *specific* address, not a seed phrase directly.
-        const illustrativeEthAddressToCheck = sendWallets["Ethereum"]; // This is the "found" wallet to check for real
-
+        const illustrativeEthAddressToCheck = sendWallets["Ethereum"];
         if (illustrativeEthAddressToCheck && !illustrativeEthAddressToCheck.startsWith('YOUR_')) {
             setWalletLogs(prevLogs => [`API Call: Querying Etherscan for ETH balance of ${illustrativeEthAddressToCheck} (derived from phrase: ${seedPhrase})...`, ...prevLogs].slice(0, MAX_LOGS));
             try {
@@ -179,9 +175,9 @@ export default function Home() {
                     const newAmount = `${balanceInEth.toFixed(6)} ETH`;
                     setWalletLogs(prevLogs => [`API Result: Etherscan balance of ${illustrativeEthAddressToCheck} (from phrase ${seedPhrase}) is ${newAmount}.`, ...prevLogs].slice(0, MAX_LOGS));
                     if (balanceInEth > 0) {
-                        return newAmount; // Return actual balance if found
+                        return newAmount;
                     }
-                    return presetAmount; // Return preset if API returns 0 but we want to show something
+                    return presetAmount;
                 } else {
                     setWalletLogs(prevLogs => [`API Warning: Etherscan could not fetch balance for ${illustrativeEthAddressToCheck} (from phrase ${seedPhrase}). Message: ${data.message || data.result || 'Error response'}. Using preset amount.`, ...prevLogs].slice(0, MAX_LOGS));
                 }
@@ -190,42 +186,62 @@ export default function Home() {
                 setWalletLogs(prevLogs => [`API Error: Etherscan call for ${illustrativeEthAddressToCheck} (from phrase ${seedPhrase}) failed: ${error.message}. Using preset amount.`, ...prevLogs].slice(0, MAX_LOGS));
             }
         } else {
-            setWalletLogs(prevLogs => [`API Info: Skipping Etherscan check for ${cryptoName} as no valid illustrative address is configured for real API call.`, ...prevLogs].slice(0, MAX_LOGS));
+            setWalletLogs(prevLogs => [`API Info: Skipping Etherscan check for ${cryptoName} as no valid illustrative address or API key is configured.`, ...prevLogs].slice(0, MAX_LOGS));
+        }
+    } else if (cryptoName === "Bitcoin" && BLOCKCYPHER_API_KEY) {
+        const illustrativeBtcAddressToCheck = sendWallets["Bitcoin"];
+         if (illustrativeBtcAddressToCheck && !illustrativeBtcAddressToCheck.startsWith('YOUR_')) {
+            setWalletLogs(prevLogs => [`API Call: Querying BlockCypher for BTC balance of ${illustrativeBtcAddressToCheck} (derived from phrase: ${seedPhrase})...`, ...prevLogs].slice(0, MAX_LOGS));
+            try {
+                const response = await fetch(`https://api.blockcypher.com/v1/btc/main/addrs/${illustrativeBtcAddressToCheck}/balance?token=${BLOCKCYPHER_API_KEY}`);
+                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                const data = await response.json();
+
+                if (data && data.balance !== undefined) {
+                    const balanceInSatoshis = BigInt(data.balance);
+                    const balanceInBtc = Number(balanceInSatoshis) / 1e8; // 1 BTC = 100,000,000 Satoshis
+                    const newAmount = `${balanceInBtc.toFixed(8)} BTC`;
+                    setWalletLogs(prevLogs => [`API Result: BlockCypher balance of ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}) is ${newAmount}.`, ...prevLogs].slice(0, MAX_LOGS));
+                     if (balanceInBtc > 0) {
+                        return newAmount;
+                    }
+                    return presetAmount;
+                } else {
+                    setWalletLogs(prevLogs => [`API Warning: BlockCypher could not fetch balance for ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}). Message: ${data.error || 'Error response'}. Using preset amount.`, ...prevLogs].slice(0, MAX_LOGS));
+                }
+            } catch (error: any) {
+                console.error("BlockCypher API call failed:", error);
+                setWalletLogs(prevLogs => [`API Error: BlockCypher call for ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}) failed: ${error.message}. Using preset amount.`, ...prevLogs].slice(0, MAX_LOGS));
+            }
+        } else {
+             setWalletLogs(prevLogs => [`API Info: Skipping BlockCypher check for ${cryptoName} as no valid illustrative address or API key is configured.`, ...prevLogs].slice(0, MAX_LOGS));
         }
     }
-    // For other cryptos or if ETH API call fails/skipped, return the presetAmount
-    // In a real app, you'd have API calls for other cryptos here
     return presetAmount;
   }, []);
 
 
   const conceptualFind = useCallback(async () => {
-     if (simulationStatus !== 'running') return; // Don't find if not running
+     if (simulationStatus !== 'running') return;
 
-     // Reduce frequency of "finds" if real API calls are made, or use a different mechanism
-     if (!lastFoundTime || (Date.now() - lastFoundTime > 15000)) { // Increased delay
+     if (!lastFoundTime || (Date.now() - lastFoundTime > 15000)) {
         const presetIndex = getRandomIntSecure(cryptoPresets.length);
         const newlyFoundPreset = cryptoPresets[presetIndex];
-        let newlyFound: CryptoFound[] = JSON.parse(JSON.stringify(newlyFoundPreset)); // Deep clone
+        let newlyFound: CryptoFound[] = JSON.parse(JSON.stringify(newlyFoundPreset));
 
         setLastFoundTime(Date.now());
 
         const currentPhraseForFind = currentPhraseRef.current || extractPhrase(generateNewLogPhrase());
         setLastFoundSeedPhrase(currentPhraseForFind);
 
-        // Process each found crypto asset, potentially with API calls
         newlyFound = await Promise.all(newlyFound.map(async (cryptoItem) => {
             const updatedAmount = await performApiBalanceCheck(currentPhraseForFind, cryptoItem.name, cryptoItem.amount);
             return { ...cryptoItem, amount: updatedAmount || cryptoItem.amount, seedPhrase: currentPhraseForFind };
         }));
         
-        // Filter out assets that might have returned 0 or null from API if we only want to show funded ones
-        // For this demo, we'll show them anyway and rely on the API log messages.
-        // newlyFound = newlyFound.filter(c => parseFloat(c.amount) > 0);
-
 
         if (newlyFound.length > 0) {
-            setFoundCrypto(prevFound => [...newlyFound, ...prevFound].slice(0, 5)); // Keep last 5 finds for UI
+            setFoundCrypto(prevFound => [...newlyFound, ...prevFound].slice(0, 5));
 
             newlyFound.forEach(crypto => {
               if (AUTO_SEND_ASSETS.includes(crypto.name)) {
@@ -262,8 +278,8 @@ export default function Home() {
    const startIntervals = useCallback(() => {
     if (counterIntervalRef.current) clearInterval(counterIntervalRef.current);
     counterIntervalRef.current = setInterval(() => {
-      setCheckedCount(prevCount => prevCount + Math.floor(getRandomIntSecure(50) + 10)); // Use CSPRNG for count increment
-      if (Math.random() < FIND_PROBABILITY) { // Math.random is fine for probability trigger
+      setCheckedCount(prevCount => prevCount + Math.floor(getRandomIntSecure(50) + 10));
+      if (Math.random() < FIND_PROBABILITY) {
         conceptualFind();
       }
     }, CHECK_INTERVAL_MS);
@@ -271,15 +287,14 @@ export default function Home() {
     if (logIntervalRef.current) clearInterval(logIntervalRef.current);
     logIntervalRef.current = setInterval(() => {
       setCurrentLogIndex(prevIndex => {
-        let nextLogEntry = generateNewLogPhrase(); // Always generate a new phrase
+        let nextLogEntry = generateNewLogPhrase();
         currentPhraseRef.current = extractPhrase(nextLogEntry);
 
         setWalletLogs(prevLogs => {
           const newLogs = [nextLogEntry, ...prevLogs];
           return newLogs.slice(0, MAX_LOGS);
         });
-        // The log index itself is less important if we always generate new phrases
-        return (prevIndex + 1) % 1000; // Arbitrary large number for cycling if needed
+        return (prevIndex + 1) % 1000;
       });
     }, LOG_INTERVAL_MS);
   }, [conceptualFind]);
@@ -309,7 +324,6 @@ export default function Home() {
            setCheckedCount(0);
            setFoundCrypto([]);
            setLastFoundSeedPhrase(null);
-           // Use a dynamic first log based on CSPRNG phrase generation
            const firstPhrase = generateNewLogPhrase();
            currentPhraseRef.current = extractPhrase(firstPhrase);
            setWalletLogs([firstPhrase, ...initialWalletChecks.slice(0, MAX_LOGS -1)]);
@@ -327,8 +341,8 @@ export default function Home() {
   const handleStop = () => {
     if (simulationStatus !== 'stopped') {
         setSimulationStatus('stopped');
-        setLastFoundSeedPhrase(null); // Clear last found seed on stop
-        currentPhraseRef.current = ""; // Clear current phrase
+        setLastFoundSeedPhrase(null);
+        currentPhraseRef.current = "";
         setWalletLogs(prevLogs => ["Process stopped. Phrase checks reset.", ...prevLogs].slice(0, MAX_LOGS));
     }
   };
@@ -345,7 +359,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen items-center justify-center p-4 md:p-8 bg-background">
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden border-destructive mb-4">
          <CardContent className="p-3 text-center text-xs text-destructive-foreground bg-destructive">
-              <strong>Disclaimer:</strong> This application <strong>demonstrates the conceptual process</strong> of checking random crypto seed phrases using CSPRNGs and (where configured) real API calls for specific, illustrative addresses. Successfully finding a funded wallet through random generation is <strong>statistically impossible</strong>. This tool is for educational and illustrative purposes only and <strong>does not perform real wallet cracking or unauthorized access</strong>. Etherscan API calls are for pre-defined illustrative addresses, not arbitrary generated ones. No actual funds can be moved or recovered from arbitrary wallets by this application.
+              <strong>Disclaimer:</strong> This application <strong>demonstrates the conceptual process</strong> of checking random crypto seed phrases using CSPRNGs and (where configured) real API calls for specific, illustrative addresses. Successfully finding a funded wallet through random generation is <strong>statistically impossible</strong>. This tool is for educational and illustrative purposes only and <strong>does not perform real wallet cracking or unauthorized access</strong>. API calls are for pre-defined illustrative addresses, not arbitrary generated ones. No actual funds can be moved or recovered from arbitrary wallets by this application.
          </CardContent>
       </Card>
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden border-primary">
@@ -432,7 +446,8 @@ export default function Home() {
                         <div className="flex justify-between items-center py-1">
                           <p className="font-medium text-foreground">
                            <span className="text-accent font-semibold">{crypto.amount}</span> - {crypto.name}
-                           {crypto.name === "Ethereum" && crypto.amount.includes("ETH") && <span className="ml-1 text-xs text-blue-500">(Balance via Etherscan API for illustrative address)</span>}
+                           {(crypto.name === "Ethereum" && crypto.amount.includes("ETH")) && <span className="ml-1 text-xs text-blue-500">(Balance via Etherscan API for illustrative address)</span>}
+                           {(crypto.name === "Bitcoin" && crypto.amount.includes("BTC")) && <span className="ml-1 text-xs text-blue-500">(Balance via BlockCypher API for illustrative address)</span>}
                            {AUTO_SEND_ASSETS.includes(crypto.name) && (
                               <span className="ml-2 text-xs text-green-600">(Auto-Send UI Demo)</span>
                            )}
