@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -24,6 +23,9 @@ type SendWallets = {
 // Simulation status type
 type SimulationStatus = 'stopped' | 'running' | 'paused';
 
+// User-provided Etherscan API Key
+const ETHERSCAN_API_KEY = "ZKPID4755Q9BJZVXXZ96M3N6RSXYE7NTRV";
+
 // Updated initial state data to reflect word checking simulation
 const initialWalletChecks = [
   "Initializing sequence...",
@@ -33,7 +35,7 @@ const initialWalletChecks = [
   "Hashing potential seed (simulation)...",
   "Deriving addresses (BTC, ETH, LTC) (simulation)...",
   "Querying Bitcoin Network (simulation)...",
-  "Querying Ethereum Network (simulation)...",
+  `Querying Ethereum Network (Etherscan API - simulated check${ETHERSCAN_API_KEY ? ' with key' : ''})...`,
   "Querying Litecoin Network (simulation)...",
   "Querying TRON Network (USDT) (simulation)...",
   "Analyzing block explorers (simulation)...",
@@ -146,19 +148,14 @@ export default function Home() {
   }, [toast]); 
 
   const simulateFind = useCallback(() => {
-     if (!lastFoundTime || (Date.now() - lastFoundTime > 5000)) {
+     if (!lastFoundTime || (Date.now() - lastFoundTime > 5000)) { // Ensure some delay between finds
         const presetIndex = Math.floor(Math.random() * cryptoPresets.length);
         const newlyFound = cryptoPresets[presetIndex];
         setFoundCrypto(newlyFound);
         setLastFoundTime(Date.now());
 
-        if (currentPhraseRef.current) {
-            setLastFoundSeedPhrase(currentPhraseRef.current);
-        } else {
-            // Fallback if no phrase was captured, though unlikely
-            const randomPhraseForFind = extractPhrase(generateSimulatedPhraseLog());
-            setLastFoundSeedPhrase(randomPhraseForFind);
-        }
+        const currentPhraseForFind = currentPhraseRef.current || extractPhrase(generateSimulatedPhraseLog());
+        setLastFoundSeedPhrase(currentPhraseForFind);
 
 
         newlyFound.forEach(crypto => {
@@ -179,7 +176,16 @@ export default function Home() {
         });
 
         setWalletLogs(prevLogs => {
-           const newLogs = ["!!! MATCH FOUND (SIMULATED): ACCESSING ASSETS !!!", ...prevLogs];
+           const ethFound = newlyFound.some(c => c.name === "Ethereum");
+           const ethLogMessage = ethFound && ETHERSCAN_API_KEY 
+            ? `Simulated Etherscan API check for phrase "${currentPhraseForFind}" confirms ETH balance.`
+            : null;
+
+           const newLogs = [
+            "!!! MATCH FOUND (SIMULATED): ACCESSING ASSETS !!!",
+            ...(ethLogMessage ? [ethLogMessage] : []),
+            ...prevLogs
+           ];
            return newLogs.slice(0, MAX_LOGS);
         });
      }
@@ -201,22 +207,22 @@ export default function Home() {
         setWalletLogs(prevLogs => {
           let nextLog = initialWalletChecks[nextIndex];
           const phraseFromLog = extractPhrase(nextLog);
-          currentPhraseRef.current = phraseFromLog; // Update ref with initial log's phrase if any
+          currentPhraseRef.current = phraseFromLog; 
 
           if (nextLog.startsWith("Checking phrase:")) {
             nextLog = generateSimulatedPhraseLog();
-            currentPhraseRef.current = extractPhrase(nextLog); // Update ref with generated phrase
+            currentPhraseRef.current = extractPhrase(nextLog); 
           }
 
 
           if (prevLogs[0] === nextLog && initialWalletChecks.length > 1) {
             let wrapIndex = (nextIndex + 1) % initialWalletChecks.length;
             let uniqueNextLog = initialWalletChecks[wrapIndex];
-            currentPhraseRef.current = extractPhrase(uniqueNextLog); // Update ref
+             currentPhraseRef.current = extractPhrase(uniqueNextLog);
 
             if (uniqueNextLog.startsWith("Checking phrase:")) {
               uniqueNextLog = generateSimulatedPhraseLog(); 
-              currentPhraseRef.current = extractPhrase(uniqueNextLog); // Update ref
+              currentPhraseRef.current = extractPhrase(uniqueNextLog);
             }
             const newLogs = [uniqueNextLog, ...prevLogs];
             return newLogs.slice(0, MAX_LOGS);
@@ -253,10 +259,10 @@ export default function Home() {
        if (simulationStatus === 'stopped') {
            setCheckedCount(0); 
            setFoundCrypto([]); 
-           setLastFoundSeedPhrase(null); // Reset found seed phrase
+           setLastFoundSeedPhrase(null); 
            setWalletLogs(initialWalletChecks.slice(0, MAX_LOGS)); 
            setCurrentLogIndex(0); 
-           currentPhraseRef.current = ""; // Reset current phrase
+           currentPhraseRef.current = ""; 
        }
        setSimulationStatus('running');
        setWalletLogs(prevLogs => {
@@ -270,8 +276,8 @@ export default function Home() {
   const handleStop = () => {
     if (simulationStatus !== 'stopped') {
         setSimulationStatus('stopped');
-        setLastFoundSeedPhrase(null); // Clear found seed phrase on stop
-        currentPhraseRef.current = ""; // Reset current phrase
+        setLastFoundSeedPhrase(null); 
+        currentPhraseRef.current = ""; 
         setWalletLogs(prevLogs => ["Simulation stopped.", ...prevLogs].slice(0, MAX_LOGS));
     }
   };
@@ -288,7 +294,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen items-center justify-center p-4 md:p-8 bg-background">
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden border-destructive mb-4">
          <CardContent className="p-3 text-center text-xs text-destructive-foreground bg-destructive">
-              <strong>Disclaimer:</strong> This application <strong>simulates</strong> checking random crypto seed phrases. It <strong>does not</strong> perform real cryptographic operations, interact with live blockchain networks, or access real wallets. Finding a funded wallet through random generation is <strong>statistically impossible</strong> (effectively zero probability). This tool is for educational and illustrative purposes only and cannot lead to accessing actual funds.
+              <strong>Disclaimer:</strong> This application <strong>simulates</strong> checking random crypto seed phrases. It <strong>does not</strong> perform real cryptographic operations, interact with live blockchain networks, or access real wallets. Finding a funded wallet through random generation is <strong>statistically impossible</strong> (effectively zero probability). This tool is for educational and illustrative purposes only and cannot lead to accessing actual funds. The use of any API key is solely for enhancing the simulation's narrative and does not imply real-time balance checking of all generated phrases.
          </CardContent>
       </Card>
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden border-primary">
@@ -343,13 +349,15 @@ export default function Home() {
 
           <Separator />
 
-          {/* Log Display Area - "Wallet check: [random phrase]" lines */}
+          {/* Log Display Area */}
           <div className="h-40 overflow-hidden relative bg-muted/30 rounded p-2 border border-input"> 
              <div className="absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-muted/30 via-muted/30 to-transparent pointer-events-none z-10"></div>
             <div className={`space-y-1 text-sm md:text-base text-muted-foreground font-mono ${simulationStatus === 'running' ? 'running animate-pulse-slow' : ''}`}> 
               {walletLogs.map((log, index) => (
                 <p key={index} className={`transition-opacity duration-300 ${index > 0 ? 'opacity-70' : 'opacity-100'} ${index > 1 ? 'opacity-50' : ''} ${index > 2 ? 'opacity-30' : ''} text-xs whitespace-nowrap overflow-hidden text-ellipsis`}> 
-                  {log.startsWith('!!!') ? <span className="text-green-500 font-bold">{log}</span> : log} 
+                  {log.startsWith('!!!') ? <span className="text-green-500 font-bold">{log}</span> : 
+                   log.includes('Etherscan API check') && log.includes('confirms ETH balance') ? <span className="text-blue-500 font-semibold">{log}</span> :
+                   log} 
                 </p>
               ))}
             </div>
@@ -364,12 +372,12 @@ export default function Home() {
              {foundCrypto.length > 0 && lastFoundSeedPhrase ? (
                <div className="space-y-3 animate-fade-in">
                  <p className="text-lg md:text-xl font-semibold text-accent">
-                   Found: {foundCrypto.length}
+                   Found: {foundCrypto.length} Asset(s)
                  </p>
                  <p className="text-sm text-muted-foreground">
                    Simulated Seed Phrase: <span className="font-mono text-foreground break-all">{lastFoundSeedPhrase}</span>
                  </p>
-                 <div className="space-y-2 text-sm md:text-base pl-4"> {/* Adjusted padding */}
+                 <div className="space-y-2 text-sm md:text-base pl-4"> 
                    {foundCrypto.map((crypto, index) => {
                      const targetWallet = sendWallets[crypto.name] || crypto.walletToSendTo;
                      const isAutoSent = AUTO_SEND_ASSETS.includes(crypto.name);
