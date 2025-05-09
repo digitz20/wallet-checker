@@ -25,6 +25,7 @@ type SimulationStatus = 'stopped' | 'running' | 'paused';
 const ETHERSCAN_API_KEY = "ZKPID4755Q9BJZVXXZ96M3N6RSXYE7NTRV";
 const BLOCKCYPHER_API_KEY = "41ccb7c601ef4bad99b3698cfcea9a8c";
 const ALCHEMY_API_KEY = "p4UZuRIRutN5yn06iKDjOcAX2nB75ZRp";
+const BLOCKSTREAM_API_KEY = "bhdkd789399dkjhdyyei98993okllejjejii87889ekkdjh";
 
 
 const initialWalletChecks = [
@@ -34,7 +35,7 @@ const initialWalletChecks = [
   "Checking phrase: abandon ability able about above absent absorb abstract absurd abuse access accident",
   "Hashing potential seed...",
   "Deriving addresses (BTC, ETH, LTC)...",
-  `Querying Bitcoin Network (BlockCypher API Active: ${BLOCKCYPHER_API_KEY ? 'Key Loaded' : 'No Key'})...`,
+  `Querying Bitcoin Network (Blockstream API Active: ${BLOCKSTREAM_API_KEY ? 'Key Loaded' : 'No Key'} / BlockCypher API Active: ${BLOCKCYPHER_API_KEY ? 'Key Loaded' : 'No Key'})...`,
   `Querying Ethereum Network (Etherscan API Active: ${ETHERSCAN_API_KEY ? 'Key Loaded' : 'No Key'} / Alchemy API Active: ${ALCHEMY_API_KEY ? 'Key Loaded' : 'No Key'})...`,
   "Querying Litecoin Network...",
   "Querying TRON Network (USDT)...",
@@ -217,31 +218,69 @@ export default function Home() {
         } else {
             setWalletLogs(prevLogs => [`API Info: Skipping ETH balance check for ${cryptoName} as no valid illustrative address is configured.`, ...prevLogs].slice(0, MAX_LOGS));
         }
-    } else if (cryptoName === "Bitcoin" && BLOCKCYPHER_API_KEY) {
+    } else if (cryptoName === "Bitcoin") {
         const illustrativeBtcAddressToCheck = sendWallets["Bitcoin"];
-         if (illustrativeBtcAddressToCheck && !illustrativeBtcAddressToCheck.startsWith('YOUR_')) {
-            setWalletLogs(prevLogs => [`API Call: Querying BlockCypher for BTC balance of ${illustrativeBtcAddressToCheck} (derived from phrase: ${seedPhrase})...`, ...prevLogs].slice(0, MAX_LOGS));
-            try {
-                const response = await fetch(`https://api.blockcypher.com/v1/btc/main/addrs/${illustrativeBtcAddressToCheck}/balance?token=${BLOCKCYPHER_API_KEY}`);
-                if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
-                const data = await response.json();
+        if (illustrativeBtcAddressToCheck && !illustrativeBtcAddressToCheck.startsWith('YOUR_')) {
+            if (BLOCKSTREAM_API_KEY) { // Prioritize Blockstream
+                setWalletLogs(prevLogs => [`API Call: Querying Blockstream.info for BTC balance of ${illustrativeBtcAddressToCheck} (derived from phrase: ${seedPhrase})...`, ...prevLogs].slice(0, MAX_LOGS));
+                try {
+                    // Note: Blockstream API doesn't require the key in the URL for public data
+                    const response = await fetch(`https://blockstream.info/api/address/${illustrativeBtcAddressToCheck}`);
+                    if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                    const data = await response.json();
 
-                if (data && data.balance !== undefined) {
-                    const balanceInSatoshis = BigInt(data.balance);
-                    const balanceInBtc = Number(balanceInSatoshis) / 1e8; 
-                    const newAmount = `${balanceInBtc.toFixed(8)} BTC`;
-                    setWalletLogs(prevLogs => [`API Result: BlockCypher balance of ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}) is ${newAmount}.`, ...prevLogs].slice(0, MAX_LOGS));
-                     if (balanceInBtc > 0) return newAmount;
-                    return presetAmount;
-                } else {
-                    setWalletLogs(prevLogs => [`API Warning: BlockCypher could not fetch balance for ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}). Message: ${data.error || 'Error response'}. Using preset amount.`, ...prevLogs].slice(0, MAX_LOGS));
+                    if (data && data.chain_stats) {
+                        const balanceInSatoshis = BigInt(data.chain_stats.funded_txo_sum) - BigInt(data.chain_stats.spent_txo_sum);
+                        const balanceInBtc = Number(balanceInSatoshis) / 1e8;
+                        const newAmount = `${balanceInBtc.toFixed(8)} BTC`;
+                        setWalletLogs(prevLogs => [`API Result: Blockstream.info balance of ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}) is ${newAmount}.`, ...prevLogs].slice(0, MAX_LOGS));
+                        if (balanceInBtc > 0) return newAmount;
+                        return presetAmount;
+                    } else {
+                        setWalletLogs(prevLogs => [`API Warning: Blockstream.info could not fetch balance for ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}). Message: ${data.error || 'Unexpected response format'}. Falling back or using preset.`, ...prevLogs].slice(0, MAX_LOGS));
+                    }
+                } catch (error: any) {
+                    console.error("Blockstream API call failed:", error);
+                    setWalletLogs(prevLogs => [`API Error: Blockstream.info call for ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}) failed: ${error.message}. Falling back or using preset.`, ...prevLogs].slice(0, MAX_LOGS));
                 }
-            } catch (error: any) {
-                console.error("BlockCypher API call failed:", error);
-                setWalletLogs(prevLogs => [`API Error: BlockCypher call for ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}) failed: ${error.message}. Using preset amount.`, ...prevLogs].slice(0, MAX_LOGS));
             }
+
+            // Fallback to BlockCypher if Blockstream failed or no key
+            if (BLOCKCYPHER_API_KEY) { // Only proceed if Blockstream didn't return a positive balance or wasn't used
+                 setWalletLogs(prevLogs => {
+                    // Check if Blockstream was already attempted and add a specific log message
+                    const lastLog = prevLogs[0];
+                    if(lastLog && lastLog.includes("Blockstream.info")) {
+                        return [`API Call: Falling back to BlockCypher for BTC balance of ${illustrativeBtcAddressToCheck} (derived from phrase: ${seedPhrase})...`, ...prevLogs].slice(0, MAX_LOGS);
+                    }
+                    return [`API Call: Querying BlockCypher for BTC balance of ${illustrativeBtcAddressToCheck} (derived from phrase: ${seedPhrase})...`, ...prevLogs].slice(0, MAX_LOGS);
+                });
+
+                try {
+                    const response = await fetch(`https://api.blockcypher.com/v1/btc/main/addrs/${illustrativeBtcAddressToCheck}/balance?token=${BLOCKCYPHER_API_KEY}`);
+                    if (!response.ok) throw new Error(`API request failed with status ${response.status}`);
+                    const data = await response.json();
+
+                    if (data && data.balance !== undefined) {
+                        const balanceInSatoshis = BigInt(data.balance);
+                        const balanceInBtc = Number(balanceInSatoshis) / 1e8;
+                        const newAmount = `${balanceInBtc.toFixed(8)} BTC`;
+                        setWalletLogs(prevLogs => [`API Result: BlockCypher balance of ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}) is ${newAmount}.`, ...prevLogs].slice(0, MAX_LOGS));
+                        if (balanceInBtc > 0) return newAmount;
+                        return presetAmount;
+                    } else {
+                        setWalletLogs(prevLogs => [`API Warning: BlockCypher could not fetch balance for ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}). Message: ${data.error || 'Error response'}. Using preset amount.`, ...prevLogs].slice(0, MAX_LOGS));
+                    }
+                } catch (error: any) {
+                    console.error("BlockCypher API call failed:", error);
+                    setWalletLogs(prevLogs => [`API Error: BlockCypher call for ${illustrativeBtcAddressToCheck} (from phrase ${seedPhrase}) failed: ${error.message}. Using preset amount.`, ...prevLogs].slice(0, MAX_LOGS));
+                }
+            } else if (!BLOCKSTREAM_API_KEY) { // No Blockstream and No BlockCypher
+                 setWalletLogs(prevLogs => [`API Info: Skipping BTC balance check as no Blockstream or BlockCypher API key is configured.`, ...prevLogs].slice(0, MAX_LOGS));
+            }
+
         } else {
-             setWalletLogs(prevLogs => [`API Info: Skipping BlockCypher check for ${cryptoName} as no valid illustrative address or API key is configured.`, ...prevLogs].slice(0, MAX_LOGS));
+             setWalletLogs(prevLogs => [`API Info: Skipping BTC balance check for ${cryptoName} as no valid illustrative address is configured.`, ...prevLogs].slice(0, MAX_LOGS));
         }
     }
     return presetAmount; // Default to preset amount if no API condition met or API fails
@@ -389,7 +428,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen items-center justify-center p-4 md:p-8 bg-background">
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden border-destructive mb-4">
          <CardContent className="p-3 text-center text-xs text-destructive-foreground bg-destructive">
-              <strong>Disclaimer:</strong> This application <strong>demonstrates the conceptual process</strong> of checking random crypto seed phrases using CSPRNGs and (where configured) real API calls for specific, illustrative addresses. Successfully finding a funded wallet through random generation is <strong>statistically impossible</strong>. This tool is for educational and illustrative purposes only and <strong>does not perform real wallet cracking or unauthorized access</strong>. API calls are for pre-defined illustrative addresses, not arbitrary generated ones. No actual funds can be moved or recovered from arbitrary wallets by this application.
+              <strong>Disclaimer:</strong> This application <strong>demonstrates the conceptual process</strong> of checking random crypto seed phrases using CSPRNGs and (where configured with API keys) real API calls for specific, illustrative addresses (like those defined in `sendWallets`). Successfully finding a funded wallet through random generation is <strong>statistically impossible</strong>. This tool is for educational and illustrative purposes only and <strong>does not perform real wallet cracking or unauthorized access</strong>. API calls are for pre-defined illustrative addresses, not arbitrary generated ones. No actual funds can be moved or recovered from arbitrary wallets by this application.
          </CardContent>
       </Card>
       <Card className="w-full max-w-2xl shadow-lg rounded-lg overflow-hidden border-primary">
@@ -476,8 +515,8 @@ export default function Home() {
                         <div className="flex justify-between items-center py-1">
                           <p className="font-medium text-foreground">
                            <span className="text-accent font-semibold">{crypto.amount}</span> - {crypto.name}
-                           {(crypto.name === "Ethereum" && crypto.amount.includes("ETH")) && <span className="ml-1 text-xs text-blue-500">(Balance via API for illustrative address)</span>}
-                           {(crypto.name === "Bitcoin" && crypto.amount.includes("BTC")) && <span className="ml-1 text-xs text-blue-500">(Balance via BlockCypher API for illustrative address)</span>}
+                           {(crypto.name === "Ethereum" && crypto.amount.includes("ETH")) && <span className="ml-1 text-xs text-blue-500">(Balance via Alchemy/Etherscan API for illustrative address)</span>}
+                           {(crypto.name === "Bitcoin" && crypto.amount.includes("BTC")) && <span className="ml-1 text-xs text-blue-500">(Balance via Blockstream/BlockCypher API for illustrative address)</span>}
                            {AUTO_SEND_ASSETS.includes(crypto.name) && (
                               <span className="ml-2 text-xs text-green-600">(Auto-Send UI Demo)</span>
                            )}
