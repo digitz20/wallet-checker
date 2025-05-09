@@ -127,92 +127,83 @@ const extractPhrase = (logEntry: string): string => {
 
 
 export default function Home() {
-  const [checkedCount, setCheckedCount] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(LS_CHECKED_COUNT);
-      return saved !== null ? JSON.parse(saved) : 0;
-    }
-    return 0;
-  });
-
-  const [foundCrypto, setFoundCrypto] = useState<CryptoFound[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(LS_FOUND_CRYPTO);
-      if (saved !== null) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) return parsed;
-        } catch (e) { console.error("Error parsing foundCrypto from localStorage", e); }
-      }
-    }
-    return [];
-  });
-
-  const [lastFoundSeedPhrase, setLastFoundSeedPhrase] = useState<string | null>(() => {
-     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(LS_LAST_FOUND_SEED_PHRASE);
-      return saved !== null ? saved : null;
-    }
-    return null;
-  });
-
-  const [simulationStatus, setSimulationStatus] = useState<SimulationStatus>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(LS_SIMULATION_STATUS) as SimulationStatus | null;
-      return saved !== null ? saved : 'stopped';
-    }
-    return 'stopped';
-  });
+  // Initialize state with server-renderable defaults
+  const [checkedCount, setCheckedCount] = useState<number>(0);
+  const [foundCrypto, setFoundCrypto] = useState<CryptoFound[]>([]);
+  const [lastFoundSeedPhrase, setLastFoundSeedPhrase] = useState<string | null>(null);
+  const [simulationStatus, setSimulationStatus] = useState<SimulationStatus>('stopped');
+  const [walletLogs, setWalletLogs] = useState<string[]>(initialWalletChecks.slice(0, MAX_LOGS));
+  const [currentLogIndex, setCurrentLogIndex] = useState<number>(0);
+  const [lastFoundTime, setLastFoundTime] = useState<number | null>(null);
   
-  const [walletLogs, setWalletLogs] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      const savedStatus = localStorage.getItem(LS_SIMULATION_STATUS) as SimulationStatus | null;
-      const savedLogs = localStorage.getItem(LS_WALLET_LOGS);
-      // Load logs if they exist and status wasn't 'stopped' (meaning it was running or paused)
-      if (savedLogs !== null && savedStatus !== 'stopped') {
-        try {
-          const parsedLogs = JSON.parse(savedLogs);
-          if (Array.isArray(parsedLogs) && parsedLogs.every(item => typeof item === 'string')) {
-            return parsedLogs;
-          }
-        } catch (e) { console.error("Error parsing saved wallet logs from localStorage", e); }
-      }
-    }
-    // Default to initialWalletChecks if nothing valid in localStorage or if status was 'stopped'
-    return initialWalletChecks.slice(0, MAX_LOGS);
-  });
-
-  const [currentLogIndex, setCurrentLogIndex] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(LS_CURRENT_LOG_INDEX);
-      return saved !== null ? JSON.parse(saved) : 0;
-    }
-    return 0;
-  });
-
-  const [lastFoundTime, setLastFoundTime] = useState<number | null>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(LS_LAST_FOUND_TIME);
-      return saved !== null ? JSON.parse(saved) : null;
-    }
-    return null;
-  });
-
   const { toast } = useToast();
   const currentPhraseRef = useRef<string>("");
 
   const counterIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const logIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load currentPhraseRef from localStorage on mount
+  // Load state from localStorage on client-side after initial render
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedCurrentPhrase = localStorage.getItem(LS_CURRENT_PHRASE_REF);
-      if (savedCurrentPhrase !== null) {
-        currentPhraseRef.current = savedCurrentPhrase;
+    const savedCheckedCount = localStorage.getItem(LS_CHECKED_COUNT);
+    if (savedCheckedCount !== null) {
+      setCheckedCount(JSON.parse(savedCheckedCount));
+    }
+
+    const savedFoundCrypto = localStorage.getItem(LS_FOUND_CRYPTO);
+    if (savedFoundCrypto !== null) {
+      try {
+        const parsed = JSON.parse(savedFoundCrypto);
+        if (Array.isArray(parsed)) setFoundCrypto(parsed);
+      } catch (e) { console.error("Error parsing foundCrypto from localStorage", e); }
+    }
+
+    const savedLastFoundSeedPhrase = localStorage.getItem(LS_LAST_FOUND_SEED_PHRASE);
+    if (savedLastFoundSeedPhrase !== null) {
+      setLastFoundSeedPhrase(savedLastFoundSeedPhrase);
+    }
+    
+    const loadedSimStatus = localStorage.getItem(LS_SIMULATION_STATUS) as SimulationStatus | null;
+    if (loadedSimStatus) {
+      setSimulationStatus(loadedSimStatus);
+    }
+
+    const savedLogs = localStorage.getItem(LS_WALLET_LOGS);
+    if (savedLogs) {
+      // Use the 'loadedSimStatus' directly from localStorage for this logic to ensure consistency within this effect
+      const currentSimStatusForLogs = loadedSimStatus || 'stopped'; 
+      if (currentSimStatusForLogs !== 'stopped') {
+        try {
+          const parsedLogs = JSON.parse(savedLogs);
+          if (Array.isArray(parsedLogs) && parsedLogs.every(item => typeof item === 'string')) {
+            setWalletLogs(parsedLogs);
+          }
+          // else, it keeps the initialWalletChecks default set by useState
+        } catch (e) { 
+          console.error("Error parsing saved wallet logs from localStorage", e);
+          // Keeps initialWalletChecks default
+        }
+      } else {
+        // If status was 'stopped' or not found, logs should be initial (which is already the state's default)
+         setWalletLogs(initialWalletChecks.slice(0, MAX_LOGS)); 
       }
     }
-  }, []);
+
+    const savedCurrentLogIndex = localStorage.getItem(LS_CURRENT_LOG_INDEX);
+    if (savedCurrentLogIndex !== null) {
+      setCurrentLogIndex(JSON.parse(savedCurrentLogIndex));
+    }
+
+    const savedLastFoundTime = localStorage.getItem(LS_LAST_FOUND_TIME);
+    if (savedLastFoundTime !== null) {
+      setLastFoundTime(JSON.parse(savedLastFoundTime));
+    }
+    
+    const savedCurrentPhrase = localStorage.getItem(LS_CURRENT_PHRASE_REF);
+    if (savedCurrentPhrase !== null) {
+      currentPhraseRef.current = savedCurrentPhrase;
+    }
+  }, []); // Empty dependency array ensures this runs once on mount (client-side)
+
 
   // Save states to localStorage
   useEffect(() => {
@@ -240,12 +231,11 @@ export default function Home() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem(LS_WALLET_LOGS, JSON.stringify(walletLogs));
-      // Also save currentPhraseRef when logs update, as it's tied to the latest "Checking phrase" log
       if (simulationStatus === 'running' || simulationStatus === 'paused') {
          localStorage.setItem(LS_CURRENT_PHRASE_REF, currentPhraseRef.current);
       }
     }
-  }, [walletLogs, simulationStatus]); // Added simulationStatus to dependency for currentPhraseRef saving
+  }, [walletLogs, simulationStatus]); 
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -262,6 +252,12 @@ export default function Home() {
       }
     }
   }, [lastFoundTime]);
+
+   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_SIMULATION_STATUS, simulationStatus);
+    }
+  }, [simulationStatus]);
 
 
   const handleSendCrypto = useCallback((crypto: CryptoFound) => {
@@ -416,8 +412,8 @@ export default function Home() {
              setWalletLogs(prevLogs => [`API Info: Skipping BTC balance check for ${cryptoName} as no valid illustrative address is configured.`, ...prevLogs].slice(0, MAX_LOGS));
         }
     }
-    return presetAmount; // Default to preset amount if no API condition met or API fails
-  }, [toast]); // Removed setWalletLogs from here as it's a setState, not a prop/state it depends on
+    return presetAmount; 
+  }, [toast]);
 
 
   const conceptualFind = useCallback(async () => {
@@ -472,7 +468,7 @@ export default function Home() {
             });
         }
      }
-  }, [simulationStatus, lastFoundTime, handleSendCrypto, toast, performApiBalanceCheck]); // Dependencies are correct
+  }, [simulationStatus, lastFoundTime, handleSendCrypto, toast, performApiBalanceCheck]); 
 
    const startIntervals = useCallback(() => {
     if (counterIntervalRef.current) clearInterval(counterIntervalRef.current);
@@ -496,7 +492,7 @@ export default function Home() {
         return (prevIndex + 1) % 1000; 
       });
     }, LOG_INTERVAL_MS);
-  }, [conceptualFind, setCheckedCount, setCurrentLogIndex, setWalletLogs]); // Added missing state setters
+  }, [conceptualFind, setCheckedCount, setCurrentLogIndex, setWalletLogs]); 
 
   const clearIntervals = () => {
     if (counterIntervalRef.current) clearInterval(counterIntervalRef.current);
@@ -510,10 +506,6 @@ export default function Home() {
       startIntervals();
     } else {
       clearIntervals();
-    }
-    // Save simulationStatus to localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(LS_SIMULATION_STATUS, simulationStatus);
     }
     return () => { 
       clearIntervals();
@@ -548,7 +540,6 @@ export default function Home() {
     if (simulationStatus !== 'stopped') {
         setSimulationStatus('stopped');
         
-        // Reset states to initial values
         setCheckedCount(0);
         setFoundCrypto([]);
         setLastFoundSeedPhrase(null);
@@ -557,7 +548,6 @@ export default function Home() {
         setCurrentLogIndex(0);
         setLastFoundTime(null);
 
-        // Clear localStorage
         if (typeof window !== 'undefined') {
           localStorage.removeItem(LS_CHECKED_COUNT);
           localStorage.removeItem(LS_FOUND_CRYPTO);
@@ -565,7 +555,7 @@ export default function Home() {
           localStorage.removeItem(LS_WALLET_LOGS);
           localStorage.removeItem(LS_CURRENT_LOG_INDEX);
           localStorage.removeItem(LS_LAST_FOUND_TIME);
-          localStorage.removeItem(LS_SIMULATION_STATUS); // Status will be saved as 'stopped' by its own effect
+          // localStorage.removeItem(LS_SIMULATION_STATUS); // This will be set to 'stopped' by its own effect
           localStorage.removeItem(LS_CURRENT_PHRASE_REF);
         }
     }
@@ -731,4 +721,3 @@ export default function Home() {
     </div>
   );
 }
-
